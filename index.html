@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Druva Weight Scanner Tool</title>
+<title>Durva Scanner</title>
 
 <style>
   body {
@@ -25,25 +25,28 @@
   .header {
     background: linear-gradient(135deg, #cce5ff, #e6f2ff);
     padding: 18px;
-    font-size: 28px;
+    font-size: 26px;
     font-weight: bold;
     text-align: center;
     border-radius: 10px;
-    margin-bottom: 10px;
   }
 
-  input {
+  input, button {
     width: 100%;
-    padding: 16px;
-    font-size: 20px;
+    padding: 14px;
+    font-size: 18px;
+    margin-top: 10px;
     border-radius: 8px;
-    border: 2px solid #ccc;
-    outline: none;
+    border: 1px solid #ccc;
   }
 
-  input:focus {
-    border-color: #4f86f7;
-  }
+  button { cursor: pointer; }
+
+  .btn-primary { background: #4f86f7; color: #fff; border: none; }
+  .btn-danger { background: #ff4d4d; color: #fff; border: none; }
+  .btn-warning { background: #ffd633; border: none; }
+
+  .hidden { display: none; }
 
   .top {
     display: grid;
@@ -52,7 +55,6 @@
     margin-top: 16px;
   }
 
-  /* ===== TOTAL CARDS ===== */
   .stats {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -62,41 +64,14 @@
   .card {
     padding: 16px;
     border-radius: 10px;
-    color: #000;
     text-align: center;
-  }
-
-  .card h3 {
-    margin: 0;
-    font-size: 16px;
-    opacity: 0.85;
-  }
-
-  .card span {
-    display: block;
-    margin-top: 8px;
-    font-size: 26px;
-    font-weight: bold;
+    font-size: 18px;
   }
 
   .yellow { background: #ffe44d; }
   .green { background: #b9f5d0; }
   .blue  { background: #4f86f7; color: #fff; }
   .gray  { background: #e0e0e0; }
-
-  /* ===== ACTIONS ===== */
-  .actions button {
-    width: 100%;
-    padding: 14px;
-    margin-bottom: 12px;
-    font-size: 18px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-
-  .btn-warning { background: #ffd633; }
-  .btn-danger { background: #ff4d4d; color: #fff; }
 
   table {
     width: 100%;
@@ -108,55 +83,42 @@
     border: 1px solid #ccc;
     padding: 10px;
     text-align: center;
-    font-size: 15px;
   }
 
-  th {
-    background: #f1f1f1;
-  }
+  th { background: #f1f1f1; }
 </style>
 </head>
 
 <body>
-<div class="container">
 
-  <div class="header">Druva Weight Scanner Tool</div>
+<!-- LOGIN SCREEN -->
+<div class="container" id="loginBox">
+  <div class="header">Durva Scanner Login</div>
+  <input id="username" placeholder="User ID" />
+  <input id="password" type="password" placeholder="Password" />
+  <button class="btn-primary" onclick="login()">Login</button>
+</div>
 
-  <input
-    id="scanInput"
-    placeholder="Scan barcode here..."
-    autofocus
-  />
+<!-- APP SCREEN -->
+<div class="container hidden" id="appBox">
+  <div class="header">
+    Druva — User: <span id="currentUser"></span>
+  </div>
+
+  <input id="scanInput" placeholder="Scan barcode here..." autofocus />
 
   <div class="top">
-
-    <!-- TOTALS -->
     <div class="stats">
-      <div class="card yellow">
-        <h3>Count</h3>
-        <span id="count">0</span>
-      </div>
-
-      <div class="card green">
-        <h3>Ro. Wt Total</h3>
-        <span id="roTotal">0</span>
-      </div>
-
-      <div class="card blue">
-        <h3>Po. Wt Total</h3>
-        <span id="poTotal">0</span>
-      </div>
-
-      <div class="card gray">
-        <h3>RO %</h3>
-        <span id="roCalc">0</span>
-      </div>
+      <div class="card yellow">Count<br><b id="count">0</b></div>
+      <div class="card green">Ro Total<br><b id="roTotal">0</b></div>
+      <div class="card blue">Po Total<br><b id="poTotal">0</b></div>
+      <div class="card gray">RO %<br><b id="roCalc">0</b></div>
     </div>
 
-    <!-- ACTIONS -->
-    <div class="actions">
+    <div>
       <button class="btn-warning" onclick="removeDuplicates()">Delete Duplicate</button>
       <button class="btn-danger" onclick="clearData()">Delete Data</button>
+      <button onclick="logout()">Logout</button>
     </div>
   </div>
 
@@ -164,59 +126,94 @@
     <thead>
       <tr>
         <th>Name</th>
-        <th>Ro. Wt</th>
-        <th>Po. Wt</th>
+        <th>Ro</th>
+        <th>Po</th>
         <th>Date</th>
       </tr>
     </thead>
     <tbody id="dataBody"></tbody>
   </table>
-
 </div>
 
 <script>
-  const STORAGE_KEY = "druva_scan_data";
+  let currentUser = null;
+  let sessionId = null;
+  let storageKey = null;
+  let data = [];
 
-  const input = document.getElementById("scanInput");
-  const tbody = document.getElementById("dataBody");
+  function generateSessionId() {
+    return Date.now() + "_" + Math.random().toString(36).substring(2, 8);
+  }
 
-  let data = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  function login() {
+    const u = document.getElementById("username").value.trim();
+    const p = document.getElementById("password").value.trim();
 
-  input.addEventListener("keydown", e => {
+    if (!u || !p) {
+      alert("Enter User ID & Password");
+      return;
+    }
+
+    currentUser = u;
+
+    // Unique session per tab
+    sessionId = sessionStorage.getItem("druva_session_id");
+    if (!sessionId) {
+      sessionId = generateSessionId();
+      sessionStorage.setItem("druva_session_id", sessionId);
+    }
+
+    storageKey = `druva_data_${currentUser}_${sessionId}`;
+
+    document.getElementById("currentUser").innerText =
+      `${currentUser} (${sessionId.slice(-4)})`;
+
+    document.getElementById("loginBox").classList.add("hidden");
+    document.getElementById("appBox").classList.remove("hidden");
+
+    data = JSON.parse(localStorage.getItem(storageKey)) || [];
+    render();
+  }
+
+  function logout() {
+    sessionStorage.removeItem("druva_session_id");
+    location.reload();
+  }
+
+  document.getElementById("scanInput").addEventListener("keydown", e => {
     if (e.key === "Enter") {
-      processScan(input.value.trim());
-      input.value = "";
+      processScan(e.target.value.trim());
+      e.target.value = "";
     }
   });
 
   function processScan(text) {
-    const parts = text.split(",");
-    if (parts.length < 10) return;
+    const p = text.split(",");
+    if (p.length < 10) return;
 
     data.push({
-      name: parts[6],
-      ro: parseFloat(parts[7]),
-      po: parseFloat(parts[8]),
-      date: parts[9]
+      name: p[6],
+      ro: +p[7],
+      po: +p[8],
+      date: p[9]
     });
 
-    saveAndRender();
+    save();
   }
 
-  function saveAndRender() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  function save() {
+    localStorage.setItem(storageKey, JSON.stringify(data));
     render();
   }
 
   function render() {
-    tbody.innerHTML = "";
-    let roSum = 0, poSum = 0;
+    const body = document.getElementById("dataBody");
+    body.innerHTML = "";
 
+    let ro = 0, po = 0;
     data.forEach(d => {
-      roSum += d.ro;
-      poSum += d.po;
-
-      tbody.innerHTML += `
+      ro += d.ro; po += d.po;
+      body.innerHTML += `
         <tr>
           <td>${d.name}</td>
           <td>${d.ro.toFixed(3)}</td>
@@ -225,11 +222,10 @@
         </tr>`;
     });
 
-    document.getElementById("count").innerText = data.length;
-    document.getElementById("roTotal").innerText = roSum.toFixed(3);
-    document.getElementById("poTotal").innerText = poSum.toFixed(3);
-    document.getElementById("roCalc").innerText =
-      roSum ? ((poSum / roSum) * 100).toFixed(2) : 0;
+    count.innerText = data.length;
+    roTotal.innerText = ro.toFixed(3);
+    poTotal.innerText = po.toFixed(3);
+    roCalc.innerText = ro ? ((po / ro) * 100).toFixed(2) : 0;
   }
 
   function removeDuplicates() {
@@ -240,17 +236,15 @@
       seen.add(key);
       return true;
     });
-    saveAndRender();
+    save();
   }
 
   function clearData() {
-    if (!confirm("Are you sure you want to delete ALL data?")) return;
+    if (!confirm("Delete ALL data for this session?")) return;
     data = [];
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(storageKey);
     render();
   }
-
-  render();
 </script>
 
 </body>
