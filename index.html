@@ -6,12 +6,18 @@
 <title>Durva Scanner</title>
 
 <style>
+  /* ===== GLOBAL ===== */
   body {
     font-family: Arial, sans-serif;
     background: #f4f7fb;
     margin: 0;
     padding: 0;
     height: 100vh;
+    overflow: hidden; /* 🔒 Prevent page scroll */
+  }
+
+  .hidden {
+    display: none !important;
   }
 
   .container {
@@ -60,7 +66,7 @@
   .controls {
     padding: 12px 16px;
     position: sticky;
-    top: 58px;
+    top: 56px;
     background: #fff;
     z-index: 90;
   }
@@ -108,7 +114,7 @@
   /* ===== TABLE ===== */
   .table-wrapper {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: auto; /* ✅ Only this scrolls */
     margin-top: 10px;
   }
 
@@ -135,7 +141,7 @@
 
 <body>
 
-<!-- LOGIN -->
+<!-- LOGIN SCREEN -->
 <div class="container" id="loginBox">
   <div class="header">Durva Scanner Login</div>
   <div class="controls">
@@ -145,7 +151,7 @@
   </div>
 </div>
 
-<!-- APP -->
+<!-- APP SCREEN -->
 <div class="container hidden" id="appBox">
 
   <!-- HEADER -->
@@ -200,7 +206,9 @@
   let storageKey = null;
   let data = [];
 
-  function hashPassword(p) { return btoa(p); }
+  function hashPassword(p) {
+    return btoa(p);
+  }
 
   function login() {
     const u = username.value.trim();
@@ -208,7 +216,9 @@
     if (!u || !p) return alert("Enter User ID & Password");
 
     storageKey = `druva_${u}_${hashPassword(p)}`;
-    loginBox.style.display = "none";
+
+    loginBox.classList.add("hidden");
+    appBox.classList.remove("hidden");
     appBox.style.display = "flex";
 
     data = JSON.parse(localStorage.getItem(storageKey)) || [];
@@ -216,7 +226,9 @@
     focusScanner();
   }
 
-  function logout() { location.reload(); }
+  function logout() {
+    location.reload();
+  }
 
   scanInput.addEventListener("keydown", e => {
     if (e.key === "Enter") {
@@ -229,7 +241,13 @@
     const p = text.split(",");
     if (p.length < 10) return;
 
-    data.push({ name: p[6], ro: +p[7], po: +p[8], date: p[9] });
+    data.push({
+      name: p[6],
+      ro: +p[7],
+      po: +p[8],
+      date: p[9]
+    });
+
     save();
   }
 
@@ -244,7 +262,8 @@
     let ro = 0, po = 0;
 
     data.forEach(d => {
-      ro += d.ro; po += d.po;
+      ro += d.ro;
+      po += d.po;
       dataBody.innerHTML += `
         <tr>
           <td>${d.name}</td>
