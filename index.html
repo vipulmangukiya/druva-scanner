@@ -29,6 +29,16 @@
     font-weight: bold;
     text-align: center;
     border-radius: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .save-icon {
+    width: 22px;
+    height: 22px;
+    fill: #4f86f7;
   }
 
   input, button {
@@ -91,7 +101,7 @@
 
 <body>
 
-<!-- LOGIN SCREEN -->
+<!-- LOGIN -->
 <div class="container" id="loginBox">
   <div class="header">Durva Scanner Login</div>
   <input id="username" placeholder="User ID" />
@@ -99,13 +109,16 @@
   <button class="btn-primary" onclick="login()">Login</button>
 </div>
 
-<!-- APP SCREEN -->
+<!-- APP -->
 <div class="container hidden" id="appBox">
   <div class="header">
-    Druva — User: <span id="currentUser"></span>
+    Durva Scanner
+    <svg class="save-icon" viewBox="0 0 24 24">
+      <path d="M17 3H5a2 2 0 0 0-2 2v14l4-4h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/>
+    </svg>
   </div>
 
-  <input id="scanInput" placeholder="Scan barcode here..." autofocus />
+  <input id="scanInput" placeholder="Scan barcode here..." />
 
   <div class="top">
     <div class="stats">
@@ -136,54 +149,37 @@
 </div>
 
 <script>
-  let currentUser = null;
-  let sessionId = null;
   let storageKey = null;
   let data = [];
 
-  function generateSessionId() {
-    return Date.now() + "_" + Math.random().toString(36).substring(2, 8);
+  function hashPassword(p) {
+    return btoa(p);
   }
 
   function login() {
-    const u = document.getElementById("username").value.trim();
-    const p = document.getElementById("password").value.trim();
+    const u = username.value.trim();
+    const p = password.value.trim();
+    if (!u || !p) return alert("Enter User ID & Password");
 
-    if (!u || !p) {
-      alert("Enter User ID & Password");
-      return;
-    }
+    const pwdHash = hashPassword(p);
+    storageKey = `druva_${u}_${pwdHash}`;
 
-    currentUser = u;
-
-    // Unique session per tab
-    sessionId = sessionStorage.getItem("druva_session_id");
-    if (!sessionId) {
-      sessionId = generateSessionId();
-      sessionStorage.setItem("druva_session_id", sessionId);
-    }
-
-    storageKey = `druva_data_${currentUser}_${sessionId}`;
-
-    document.getElementById("currentUser").innerText =
-      `${currentUser} (${sessionId.slice(-4)})`;
-
-    document.getElementById("loginBox").classList.add("hidden");
-    document.getElementById("appBox").classList.remove("hidden");
+    loginBox.classList.add("hidden");
+    appBox.classList.remove("hidden");
 
     data = JSON.parse(localStorage.getItem(storageKey)) || [];
     render();
+    focusScanner();
   }
 
   function logout() {
-    sessionStorage.removeItem("druva_session_id");
     location.reload();
   }
 
-  document.getElementById("scanInput").addEventListener("keydown", e => {
+  scanInput.addEventListener("keydown", e => {
     if (e.key === "Enter") {
-      processScan(e.target.value.trim());
-      e.target.value = "";
+      processScan(scanInput.value.trim());
+      scanInput.value = "";
     }
   });
 
@@ -204,16 +200,16 @@
   function save() {
     localStorage.setItem(storageKey, JSON.stringify(data));
     render();
+    focusScanner();
   }
 
   function render() {
-    const body = document.getElementById("dataBody");
-    body.innerHTML = "";
-
+    dataBody.innerHTML = "";
     let ro = 0, po = 0;
+
     data.forEach(d => {
       ro += d.ro; po += d.po;
-      body.innerHTML += `
+      dataBody.innerHTML += `
         <tr>
           <td>${d.name}</td>
           <td>${d.ro.toFixed(3)}</td>
@@ -231,19 +227,24 @@
   function removeDuplicates() {
     const seen = new Set();
     data = data.filter(d => {
-      const key = d.name + d.date;
-      if (seen.has(key)) return false;
-      seen.add(key);
+      const k = d.name + d.date;
+      if (seen.has(k)) return false;
+      seen.add(k);
       return true;
     });
     save();
   }
 
   function clearData() {
-    if (!confirm("Delete ALL data for this session?")) return;
+    if (!confirm("Delete ALL data for this user & password?")) return;
     data = [];
     localStorage.removeItem(storageKey);
     render();
+    focusScanner();
+  }
+
+  function focusScanner() {
+    setTimeout(() => scanInput.focus(), 50);
   }
 </script>
 
