@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Druva Weight Scanner Tool</title>
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f4f7fb;
+    margin: 0;
+    padding: 12px;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: auto;
+    background: #fff;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  }
+
+  .header {
+    background: linear-gradient(135deg, #cce5ff, #e6f2ff);
+    padding: 18px;
+    font-size: 28px;
+    font-weight: bold;
+    text-align: center;
+    border-radius: 10px;
+    margin-bottom: 10px;
+  }
+
+  input {
+    width: 100%;
+    padding: 16px;
+    font-size: 20px;
+    border-radius: 8px;
+    border: 2px solid #ccc;
+    outline: none;
+  }
+
+  input:focus {
+    border-color: #4f86f7;
+  }
+
+  .top {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  /* ===== TOTAL CARDS ===== */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: 10px;
+    color: #000;
+    text-align: center;
+  }
+
+  .card h3 {
+    margin: 0;
+    font-size: 16px;
+    opacity: 0.85;
+  }
+
+  .card span {
+    display: block;
+    margin-top: 8px;
+    font-size: 26px;
+    font-weight: bold;
+  }
+
+  .yellow { background: #ffe44d; }
+  .green { background: #b9f5d0; }
+  .blue  { background: #4f86f7; color: #fff; }
+  .gray  { background: #e0e0e0; }
+
+  /* ===== ACTIONS ===== */
+  .actions button {
+    width: 100%;
+    padding: 14px;
+    margin-bottom: 12px;
+    font-size: 18px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .btn-warning { background: #ffd633; }
+  .btn-danger { background: #ff4d4d; color: #fff; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 18px;
+  }
+
+  th, td {
+    border: 1px solid #ccc;
+    padding: 10px;
+    text-align: center;
+    font-size: 15px;
+  }
+
+  th {
+    background: #f1f1f1;
+  }
+</style>
+</head>
+
+<body>
+<div class="container">
+
+  <div class="header">Druva Weight Scanner Tool</div>
+
+  <input
+    id="scanInput"
+    placeholder="Scan barcode here..."
+    autofocus
+  />
+
+  <div class="top">
+
+    <!-- TOTALS -->
+    <div class="stats">
+      <div class="card yellow">
+        <h3>Count</h3>
+        <span id="count">0</span>
+      </div>
+
+      <div class="card green">
+        <h3>Ro. Wt Total</h3>
+        <span id="roTotal">0</span>
+      </div>
+
+      <div class="card blue">
+        <h3>Po. Wt Total</h3>
+        <span id="poTotal">0</span>
+      </div>
+
+      <div class="card gray">
+        <h3>RO %</h3>
+        <span id="roCalc">0</span>
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="actions">
+      <button class="btn-warning" onclick="removeDuplicates()">Delete Duplicate</button>
+      <button class="btn-danger" onclick="clearData()">Delete Data</button>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Ro. Wt</th>
+        <th>Po. Wt</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody id="dataBody"></tbody>
+  </table>
+
+</div>
+
+<script>
+  const STORAGE_KEY = "druva_scan_data";
+
+  const input = document.getElementById("scanInput");
+  const tbody = document.getElementById("dataBody");
+
+  let data = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      processScan(input.value.trim());
+      input.value = "";
+    }
+  });
+
+  function processScan(text) {
+    const parts = text.split(",");
+    if (parts.length < 10) return;
+
+    data.push({
+      name: parts[6],
+      ro: parseFloat(parts[7]),
+      po: parseFloat(parts[8]),
+      date: parts[9]
+    });
+
+    saveAndRender();
+  }
+
+  function saveAndRender() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    render();
+  }
+
+  function render() {
+    tbody.innerHTML = "";
+    let roSum = 0, poSum = 0;
+
+    data.forEach(d => {
+      roSum += d.ro;
+      poSum += d.po;
+
+      tbody.innerHTML += `
+        <tr>
+          <td>${d.name}</td>
+          <td>${d.ro.toFixed(3)}</td>
+          <td>${d.po.toFixed(3)}</td>
+          <td>${d.date}</td>
+        </tr>`;
+    });
+
+    document.getElementById("count").innerText = data.length;
+    document.getElementById("roTotal").innerText = roSum.toFixed(3);
+    document.getElementById("poTotal").innerText = poSum.toFixed(3);
+    document.getElementById("roCalc").innerText =
+      roSum ? ((poSum / roSum) * 100).toFixed(2) : 0;
+  }
+
+  function removeDuplicates() {
+    const seen = new Set();
+    data = data.filter(d => {
+      const key = d.name + d.date;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    saveAndRender();
+  }
+
+  function clearData() {
+    if (!confirm("Are you sure you want to delete ALL data?")) return;
+    data = [];
+    localStorage.removeItem(STORAGE_KEY);
+    render();
+  }
+
+  render();
+</script>
+
+</body>
+</html>
